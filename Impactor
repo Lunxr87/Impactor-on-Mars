@@ -1,0 +1,449 @@
+# -*- coding: utf-8 -*-
+"""
+Created on Mon May  4 18:53:41 2020
+
+@author: Jeffrey Vickroy
+"""
+
+
+
+"""
+This code simulates the concept of what happens when an asteroid/impactor collides into
+the planet Mars. During the collision all the energy of the asteroid is converted into kinetic
+energy resulting in an explosion stronger than any human nuclear bomb. My code follows the 
+trajectory of 6 ejecta with the same mass but differing velocities. The asteroid is pulled 
+towards the center of Mars until it hits the surface where the explosion occurs. Each ejecta
+fly outward but only 1 has enough kinetic energy to achieve escape velocity -- the rest fall
+back onto the surface since the force of gravity from Mars always attracts them. I physically
+assigned different velocities to the ejecta to show this concept. Plots will be available
+in the plots plane dipicting how the velocities of each ejecta change over time. The velocity
+and mass of the asteroid were made large to justify seeing the many ejecta fly away.
+"""
+
+
+
+### Libraries/ Modules ###
+
+import turtle # used for graphics
+import numpy as np # used for math
+import matplotlib.pyplot as plt # used for plots
+
+
+
+### Window Settings ###
+
+# makes the window with specific characteristics
+wn = turtle.Screen() # creates a screen
+wn.title('Impactor on Mars')
+wn.setup(width = 800, height = 800) # may vary depending on computer screen
+wn.bgcolor('black') # screen color is black
+wn.setworldcoordinates(-1e7,-1e7,1e7,1e7) # makes the scaling proper for values used later
+wn.tracer(8) # speeds up program
+
+
+
+### Variables ###
+
+## initial values for impactor ##
+x = 0.3e7; y = 1.1e7 # start impactor in upper left corner
+# initial positions for ejecta -- cant be 0,0
+x_o = x_b = x_p = x_g = x_y = x_pp = 3e6
+y_o = y_b = y_p = y_g = y_y = y_pp = 3e6
+t = 0; dt = 1 # time is initially zero and will be incrimented by dt
+
+r = np.sqrt(x**2 + y**2) # equation for radial position from cartesian coords
+cost = x/r; sint = y/r # used to get x & y components of vectors
+
+v = -20e3 # [m/s] range of asteroid velocities: 8-20 [km/s] 
+# want x & y components of velocity
+vx = v*cost; vy = v*sint # negative signs make impactor go down and to the right
+# below is initial velocities for the different ejecta
+vx_o = vy_o = vx_b = vy_b = vx_p = vy_p = vx_g = vy_g = vx_y = vy_y = vx_pp = vy_pp = 0
+
+## Masses ##
+mM = 6.39e23 # [kg] mass of Mars
+mI = 1e15 # [kg] mass of impactor 
+mE = 1e5 # [kg] mass of ejecta (small piece of impactor)
+
+## Other constants ##
+G = 6.67408e-11 # [m^3 / kg s^2] Gravitational constant
+rM = 3.3895e6 # [m] radius of Mars
+v_esc = np.sqrt((2*G*mM) / rM) # [m/s] escape velocity of Mars
+crash = 0 # used to tell when the impactor crash into Mars
+
+## Lists for Plots ##
+tlist = [] # time
+# different ejecta lists
+volist = []; vblist = []; vplist = []; vglist = []; vylist = []; vpplist = []
+
+
+
+### Pens for Visual Dipiction ###
+
+## Star background ##
+# places a point representing a star at a random place in the window with rando size
+bg=turtle.Turtle()
+bg.hideturtle()
+bg.color("white")
+bg.shape("circle")
+bg.penup()
+bg.speed(0) # no animations -> maximizes speed
+# this next part will produce 500 stars of varying size and put them in random places on screen
+for n in range(500): 
+    # vary the size of the shapes with slight differences
+    val = np.random.randint(1,200)
+    new_val = val / 2000
+    bg.shapesize(new_val, new_val) # want small circles
+    # generates random x and y coordinates by picking numbers within the window size
+    valx = np.random.randint(-1e7,1e7)
+    valy = np.random.randint(-1e7,1e7)
+    # creates stars
+    bg.goto(valx,valy) # sends to random coordinates
+    bg.stamp() # stamps a white circle at the current coordinate
+#wn.update() # essentially cements the stamps into the screen
+
+## Impactor ##
+ast=turtle.Turtle() # creates pen with name ast
+ast.penup() # pick pen up
+ast.color('gray') # set pen color
+ast.pensize(5) # makes the thickness of the pen small
+ast.shape('circle')
+ast.setpos(x,y) # place pen at this location
+
+## Ejecta ##
+# orange ejecta 
+oejc=turtle.Turtle()
+oejc.hideturtle()
+oejc.color('gray')
+oejc.pensize(5)
+oejc.penup()
+# blue ejecta 
+bejc=turtle.Turtle()
+bejc.hideturtle()
+bejc.color('gray')
+bejc.pensize(5)
+bejc.penup()
+# pink ejecta 
+pejc=turtle.Turtle()
+pejc.hideturtle()
+pejc.color('gray')
+pejc.pensize(5)
+pejc.penup()
+# green ejecta 
+gejc=turtle.Turtle()
+gejc.hideturtle()
+gejc.color('gray')
+gejc.pensize(5)
+gejc.penup()
+# yellow ejecta 
+yejc=turtle.Turtle()
+yejc.hideturtle()
+yejc.color('gray')
+yejc.pensize(5)
+yejc.penup()
+# purple ejecta 
+ppejc=turtle.Turtle()
+ppejc.hideturtle()
+ppejc.color('gray')
+ppejc.pensize(5)
+ppejc.penup()
+
+## Mars ##
+# this section gives the pen attributes which will produce the planet
+pm=turtle.Turtle() # pen pm draws (P)lanet (M)ars
+pm.hideturtle()
+pm.speed(0) # no animations -> maximize processing speed
+pm.color("peru") # closest color i found to Mars
+pm.penup()
+pm.pensize(1)
+pm.begin_fill() # as the pen creates a circle, turtle will wait 
+                # until end_fill where the inside of the shape will be filled in
+# initial conditions for cricle
+rr = 3e6
+theta = 0
+dtheta = np.pi / 40
+xx = rr*np.cos(theta) # want initial x
+yy = rr*np.sin(theta) # want initial y
+pm.setpos(xx,yy) # puts the pen at x,y where theta = 0
+pm.pendown() # put pen down to draw
+i = 0
+# loops runs for 2pi, createing a circle that will be filled by the fill functions
+while theta <= 2*np.pi:
+    if i <= 81: # since dtheta is pi/40, 2pi means i = 80
+        theta = i*dtheta # the new angle increases as i or time increases
+        xx = rr*np.cos(theta)
+        yy = rr*np.sin(theta)
+        i += 1
+        if i == 81: # want to end the loop once 2pi has been reached
+            theta = 10
+        pm.setpos(xx,yy) # send the pen to the next location, creating a circle
+pm.end_fill() # this will fill the inside of the shape that was just created
+
+
+
+### Functions ###
+
+# this function creates different velocities for the ejecta to have
+# each ejecta will use a different velocity which is some fraction
+# of the escape velocity
+# x y are fed to produce accurate radii for getting the xy comps of the velocity
+# escape velocity is calculated above so i send it into this function to be used
+# pen refers to which turtle has what velocity
+def vel(pen, x, y, v_esc):
+    r = np.sqrt(x**2 + y**2); cost = x/r; sint = y/r
+    v_esc_x = v_esc*cost; v_esc_y = v_esc*sint # breakdown the escape velocity into xy comps
+    # each pen has a different fraction of the escape velocity
+    if pen == 1:
+        vy = v_esc_y*1.0; vx = -v_esc_x*1.0
+        v_ejc = np.sqrt(vx**2 + vy**2)
+    elif pen == 2:
+        vy = v_esc_y*0.9; vx = -v_esc_x*0.9
+        v_ejc = np.sqrt(vx**2 + vy**2)
+    elif pen == 3:
+        vy = v_esc_y*0.7; vx = -v_esc_x*0.7
+        v_ejc = np.sqrt(vx**2 + vy**2)
+    elif pen == 4:
+        vy = v_esc_y*0.6; vx = -v_esc_x*0.6
+        v_ejc = np.sqrt(vx**2 + vy**2)
+    elif pen == 5:
+        vy = v_esc_y*0.5; vx = -v_esc_x*0.5
+        v_ejc = np.sqrt(vx**2 + vy**2)
+    elif pen == 6:
+        vy = v_esc_y*0.4; vx = -v_esc_x*0.4
+        v_ejc = np.sqrt(vx**2 + vy**2)
+    return v_ejc
+
+
+
+### Main Loop ###
+
+# the loop has repetition as i could not get a function to work properly
+# the derivation for getting x & y are the same for each ejecta
+# but to get the ejecta to move in different paths they need different x & y
+# so i made unique variable names for these to allow the ejecta to move simultaneously
+while t < 7000: # run the program this long
+    # below are the derivations for producing x & y coords 
+    # from the force of gravity due to Mars
+    
+    ## for impactor ##
+    # radial distance
+    r = np.sqrt(x**2 + y**2); cost = x/r; sint = y/r
+    # acceleration due to gravity
+    F = -(G*mM*mI)/(r**2) # gravity force scaled down
+    ax = (F/mI)*cost; ay = (F/mI)*sint # x & y comps of acceleration of impactor
+    # velocity
+    dvx = ax*dt; dvy = ay*dt # used to change the velocity by a small amount 
+    vx += dvx; vy += dvy # x & y comps of velocity of impactor
+    # position
+    dx = vx*dt; dy = vy*dt # used to change the position by a small amount
+    x += dx; y += dy # x & y comps of position of impactor
+    
+    ## for ejecta 1 ##
+    # radial distance
+    r_o = np.sqrt(x_o**2 + y_o**2); cost_o = x_o/r_o; sint_o = y_o/r_o
+    # acceleration due to gravity
+    F_o = -(G*mM*mI)/(r_o**2) # gravity force scaled down
+    ax_o = (F_o/mI)*cost_o; ay_o = (F_o/mI)*sint_o # x & y comps of acceleration of impactor
+    # velocity
+    dvx_o = ax_o*dt; dvy_o = ay_o*dt # used to change the velocity by a small amount 
+    vx_o += dvx_o; vy_o += dvy_o # x & y comps of velocity of impactor
+    # position
+    dx_o = vx_o*dt; dy_o = vy_o*dt # used to change the position by a small amount
+    x_o += dx_o; y_o += dy_o # x & y comps of position of impactor
+    
+    ## for ejecta 2 ##
+    # radial distance 
+    r_b = np.sqrt(x_b**2 + y_b**2); cost_b = x_b/r_b; sint_b = y_b/r_b
+    # acceleration due to gravity
+    F_b = -(G*mM*mI)/(r_b**2) # gravity force scaled down
+    ax_b = (F_b/mI)*cost_b; ay_b = (F_b/mI)*sint_b # x & y comps of acceleration of impactor
+    # velocity
+    dvx_b = ax_b*dt; dvy_b = ay_b*dt # used to change the velocity by a small amount 
+    vx_b += dvx_b; vy_b += dvy_b # x & y comps of velocity of impactor
+    # position
+    dx_b = vx_b*dt; dy_b = vy_b*dt # used to change the position by a small amount
+    x_b += dx_b; y_b += dy_b # x & y comps of position of impactor
+    
+    ## for ejecta 3 ##
+    # radial distance
+    r_p = np.sqrt(x_p**2 + y_p**2); cost_p = x_p/r_p; sint_p = y_p/r_p
+    # acceleration due to gravity
+    F_p = -(G*mM*mI)/(r_p**2) # gravity force scaled down
+    ax_p = (F_p/mI)*cost_p; ay_p = (F_p/mI)*sint_p # x & y comps of acceleration of impactor
+    # velocity
+    dvx_p = ax_p*dt; dvy_p = ay_p*dt # used to change the velocity by a small amount 
+    vx_p += dvx_p; vy_p += dvy_p # x & y comps of velocity of impactor
+    # position
+    dx_p = vx_p*dt; dy_p = vy_p*dt # used to change the position by a small amount
+    x_p += dx_p; y_p += dy_p # x & y comps of position of impactor
+    
+    ## for ejecta 4 ##
+    # radial distance
+    r_g = np.sqrt(x_g**2 + y_g**2); cost_g = x_g/r_g; sint_g = y_g/r_g
+    # acceleration due to gravity
+    F_g = -(G*mM*mI)/(r_g**2) # gravity force scaled down
+    ax_g = (F_g/mI)*cost_g; ay_g = (F_g/mI)*sint_g # x & y comps of acceleration of impactor
+    # velocity
+    dvx_g = ax_g*dt; dvy_g = ay_g*dt # used to change the velocity by a small amount 
+    vx_g += dvx_g; vy_g += dvy_g # x & y comps of velocity of impactor
+    # position
+    dx_g = vx_g*dt; dy_g = vy_g*dt # used to change the position by a small amount
+    x_g += dx_g; y_g += dy_g # x & y comps of position of impactor
+    
+    ## for ejecta 5 ##
+    # radial distance
+    r_y = np.sqrt(x_y**2 + y_y**2); cost_y = x_y/r_y; sint_y = y_y/r_y
+    # acceleration due to gravity
+    F_y = -(G*mM*mI)/(r_y**2) # gravity force scaled down
+    ax_y = (F_y/mI)*cost_y; ay_y = (F_y/mI)*sint_y # x & y comps of acceleration of impactor
+    # velocity
+    dvx_y = ax_y*dt; dvy_y = ay_y*dt # used to change the velocity by a small amount 
+    vx_y += dvx_y; vy_y += dvy_y # x & y comps of velocity of impactor
+    # position
+    dx_y = vx_y*dt; dy_y = vy_y*dt # used to change the position by a small amount
+    x_y += dx_y; y_y += dy_y # x & y comps of position of impactor
+       
+    ## for ejecta 6 ##
+    # radial distance
+    r_pp = np.sqrt(x_pp**2 + y_pp**2); cost_pp = x_pp/r_pp; sint_pp = y_pp/r_pp
+    # acceleration due to gravity
+    F_pp = -(G*mM*mI)/(r_pp**2) # gravity force scaled down
+    ax_pp = (F_pp/mI)*cost_pp; ay_pp = (F_pp/mI)*sint_pp # x & y comps of acceleration of impactor
+    # velocity
+    dvx_pp = ax_pp*dt; dvy_pp = ay_pp*dt # used to change the velocity by a small amount 
+    vx_pp += dvx_pp; vy_pp += dvy_pp # x & y comps of velocity of impactor
+    # position
+    dx_pp = vx_pp*dt; dy_pp = vy_pp*dt # used to change the position by a small amount
+    x_pp += dx_pp; y_pp += dy_pp # x & y comps of position of impactor
+    
+    
+    # sends ejecta to their new positions which are calculated from above
+    oejc.goto(x_o,y_o)
+    bejc.goto(x_b,y_b)
+    pejc.goto(x_p,y_p)
+    gejc.goto(x_g,y_g)
+    yejc.goto(x_y,y_y)
+    ppejc.goto(x_pp,y_pp)
+    
+    
+    # time
+    t += dt # increase time
+    tlist += [t]
+    # velocties for plots
+    volist += [np.sqrt(vx_o**2 + vy_o**2)]
+    vblist += [np.sqrt(vx_b**2 + vy_b**2)]
+    vplist += [np.sqrt(vx_p**2 + vy_p**2)]
+    vglist += [np.sqrt(vx_g**2 + vy_g**2)]
+    vylist += [np.sqrt(vx_y**2 + vy_y**2)]
+    vpplist += [np.sqrt(vx_pp**2 + vy_pp**2)]
+    
+    
+    # if statements used for sending off ejecta when impactor hits Mars
+    if r <= rr: # when the impactor reaches the radius of Mars, ejecta get launched
+        crash += 1
+        
+    if crash == 0: # velocities wont change until impactor hits Mars
+        # the velocity should not change for the impactor    
+        vy *= 1; vx *= 1
+        vy_f = vy; vx_f = vx
+        ast.goto(x,y) # impactor will travel until it hits Mars
+        # this puts the starting point of each ejecta at the point of impact
+        x_o = x_b = x_p = x_g = x_y = x_pp = x
+        y_o = y_b = y_p = y_g = y_y = y_pp = y
+        
+    elif crash == 1: # sends out ejecta at new velocity away from Mars
+        vy = 0; vx = 0; dvy = 0; dvx = 0 # i want the impactor to stop moving once it hits Mars
+        ast.hideturtle() # this functions makes the impactor disappear
+        KE = (1/2)*mI*(vx_f**2 + vy_f**2)  # [J] energy of explosion -- all kinetic energy
+        
+        # below is the new velocities for each ejecta
+        # calls the vel velocity to produce varying velocities for each ejecta
+        vy_o = vel(1,x_o,y_o,v_esc)*sint_o
+        vx_o = -vel(1,x_o,y_o,v_esc)*cost_o
+        
+        # factors are multiplied here to send ejecta to the right
+        vy_b = vel(2,x_b,y_b,v_esc)*sint_b*0.5
+        vx_b = -vel(2,x_b,y_b,v_esc)*cost_b*-3
+        
+        vy_p = vel(3,x_p,y_p,v_esc)*sint_p
+        vx_p = -vel(3,x_p,y_p,v_esc)*cost_p
+        
+        # factors are multiplied here to send ejecta to the right
+        vy_g = vel(4,x_g,y_g,v_esc)*sint_g*0.8
+        vx_g = -vel(4,x_g,y_g,v_esc)*cost_g*-3
+        
+        # factors are multiplied here to send ejecta to the right
+        vy_y = vel(5,x_y,y_y,v_esc)*sint_y*1.5
+        vx_y = -vel(5,x_y,y_y,v_esc)*cost_y*-3
+        
+        vy_pp = vel(6,x_pp,y_pp,v_esc)*sint_pp
+        vx_pp = -vel(6,x_pp,y_pp,v_esc)*cost_pp
+
+        crash += 1 # used to make sure ejecta stop when they hit Mars
+        mI = mE # this reduces the mass drastically since an ejecta will have much less
+                # mass than that of the impactor
+        # put the pens down to trace the path of ejecta
+        oejc.pendown() 
+        bejc.pendown()
+        pejc.pendown() 
+        gejc.pendown()
+        yejc.pendown() 
+        ppejc.pendown()
+            
+    if crash > 15: # after debugging this value makes it so after the ejecta fall back
+                   # onto Mars, they stop moving
+        # this is a series of checks that stop the motion of each ejecta if 
+        # that specific ejecta hits the surface of Mars
+        # the pen gets picked up since after enough time the pens draw longer than they should
+        if abs(r_o) <= abs(rr):
+            vx_o = vy_o = 0; dvx_o = dvy_o = 0
+        if abs(r_b) <= abs(rr):
+            vx_b = vy_b = 0; dvx_b = dvy_b = 0
+            bejc.penup()
+        if abs(r_p) <= abs(rr):
+            vx_p = vy_p = 0; dvx_p = dvy_p = 0
+            pejc.penup()
+        if abs(r_g) <= abs(rr):
+            vx_g = vy_g = 0; dvx_g = dvy_g = 0
+            gejc.penup()
+        if abs(r_y) <= abs(rr):
+            vx_y = vy_y = 0; dvx_y = dvy_y = 0
+            yejc.penup()
+        if abs(r_pp) <= abs(rr):
+            vx_pp = vy_pp = 0; dvx_pp = dvy_pp = 0
+            ppejc.penup()
+# end of main loop
+
+
+
+### Endgame ###
+
+## plots ##
+# get axes limits for time and velocity of ejecta that escapes
+tmin = float(min(tlist)); tmax = float(max(tlist))
+vomin = float(min(volist)); vomax = float(max(volist))
+
+# make figure
+plt.figure()
+plt.title(f'Veloctiy over Time for all 6 Ejecta\nof Mass {mE:,.0f} kg') 
+plt.ylabel('Velocity (m/s)'); plt.xlabel('Time (s)')
+plt.axis([tmin+450,tmax,vomin,vomax]) # shift to the right since the ejecta wait for the asteroid to hit
+
+# below prints the velocities of all the ejecta in different colors
+plt.plot(tlist, volist, 'o', markersize = 1, color = 'orange')
+plt.plot(tlist, vblist, 'o', markersize = 1, color = 'blue')
+plt.plot(tlist, vplist, 'o', markersize = 1, color = 'pink')
+plt.plot(tlist, vglist, 'o', markersize = 1, color = 'green')
+plt.plot(tlist, vylist, 'o', markersize = 1, color = 'yellow')
+plt.plot(tlist, vpplist, 'o', markersize = 1, color = 'purple')
+
+
+## end program ##
+# want to end the program by clicking the screen
+# created print statements to give further information when the code ends
+print('In the graph above, each color represents one of the six ejecta.\nThe purple line is the last to draw so it covers up the other colors\nwhen the velocity = 0 m/s for that color.')
+print('When the asteroid hits Mars, the energy of the explosion is\nentirely the kinetic energy of the asteroid.')
+print(f'Energy of Impact Explosion = {KE:,.0f} J!') # prints how uch energy was created
+print('~2E23 J, which is 6 magnitudes greater than the Tsar Bomba\n(strongest human nuclear explosion) exploded with energy around 2E17 J.')
+turtle.exitonclick()
+turtle.bye()
